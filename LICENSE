@@ -1,21 +1,16 @@
-MIT License
+Copyright (c) 2026 [wddmusic]
+All rights reserved.
 
-Copyright (c) 2026 wddmusic
+【利用規約】
+本リポジトリのソースコード、および付随するすべてのファイルに関する著作権は、作者に帰属します。
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. 許可される行為
+- 個人利用の範囲内における、コードの閲覧、ダウンロード、およびローカル環境での実行。
+- 自身の学習や研究を目的とした、コードの参照。
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+2. 禁止される行為
+- 本ソフトウェアおよびその変更物を、有償・無償を問わず第三者へ再配布・転載する行為。
+- 本ソフトウェアを商用目的（営利活動、ビジネス、広告収入を目的としたサイト等）で利用する行為。
+- 作者の許可なく、本ソフトウェアをベースにした派生物を公開・配布する行為。
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+本ソフトウェアは現状のまま提供され、明示または黙示を問わず、一切の保証はありません。本ソフトウェアの使用によって生じたあらゆる損害について、作者は一切の責任を負いません。
