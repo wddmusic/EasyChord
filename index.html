@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<script>
+  // iOSのSafariはタブごとに直前の拡大率を記憶して再現することがあるため、
+  // 読み込み時にviewportを一瞬だけ強制指定し直して常に等倍(1.0)で開くようにする。
+  // ピンチズーム自体は無効化しない（読み込み後すぐ元の設定に戻す）。
+  (function(){
+    var vp=document.querySelector('meta[name="viewport"]');
+    if(!vp) return;
+    var original=vp.getAttribute('content');
+    function resetZoom(){
+      vp.setAttribute('content',original+', maximum-scale=1.0');
+      setTimeout(function(){ vp.setAttribute('content',original); },300);
+    }
+    window.addEventListener('load',resetZoom);
+    window.addEventListener('pageshow',resetZoom);
+  })();
+</script>
+<title>EasyChord</title>
+<style>
+  :root{
+    --bg:#f5f5f3;--surface:#ffffff;--surface-1:#f0efec;
+    --text:#1c1c1a;--text-secondary:#5f5e5a;--text-muted:#888780;
+    --border:#dcdad3;--border-strong:#b4b2a9;
+    --accent:#378ADD;--radius:8px;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{--bg:#1c1c1a;--surface:#2c2c2a;--surface-1:#262625;
+      --text:#f1efe8;--text-secondary:#b4b2a9;--text-muted:#888780;
+      --border:#444441;--border-strong:#5f5e5a;--accent:#85B7EB;}
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;padding:24px;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;line-height:1.6;}
+  .wrap{max-width:1040px;margin:0 auto;}
+  .layout{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start;}
+  .side-col{position:sticky;top:24px;}
+  @media(max-width:880px){.layout{grid-template-columns:1fr;}.side-col{position:static;}}
+  h1{font-size:18px;font-weight:600;margin:0 0 4px;}
+  .sub{font-size:13px;color:var(--text-muted);margin:0 0 24px;}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .field label{display:block;font-size:11px;color:var(--text-muted);margin-bottom:4px;}
+  select,input[type=text],input[type=number]{width:100%;height:34px;padding:0 8px;border:1px solid var(--border-strong);
+    border-radius:var(--radius);background:var(--surface);color:var(--text);font-size:13px;}
+  input[type=range]{width:100%;}
+  button{height:34px;padding:0 12px;border:1px solid var(--border-strong);border-radius:var(--radius);
+    background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;}
+  button:hover{background:var(--surface-1);}
+  button:active{transform:scale(0.98);}
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .row+.row{margin-top:10px;}
+  .spacer{flex:1;}
+  .small{font-size:12px;color:var(--text-secondary);}
+  .muted{font-size:12px;color:var(--text-muted);}
+  .iconbtn{width:40px;padding:0;font-size:16px;}
+  .degree-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin:10px 0 4px;}
+  .degree-btn{height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}
+  .degree-btn .label{font-size:10px;color:var(--text-muted);}
+  .degree-btn .sym{font-size:13px;font-weight:600;}
+  #list{display:flex;flex-direction:column;gap:4px;max-height:70vh;overflow:auto;}
+  .entry-row{display:flex;flex-direction:column;gap:4px;padding:8px;border:1px solid var(--border);border-radius:var(--radius);}
+  .entry-row .er-top{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+  .entry-row .er-top span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .entry-row .er-controls{display:flex;gap:4px;flex-wrap:wrap;}
+  .entry-row select{height:26px;font-size:11px;}
+  .entry-row input[type=text]{height:24px;font-size:11px;width:50px;flex-shrink:0;}
+  .empty-note{font-size:13px;color:var(--text-muted);}
+  .top-actions{display:flex;justify-content:flex-end;gap:8px;margin-bottom:8px;}
+  .file-label{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;
+    border:1px solid var(--border-strong);border-radius:var(--radius);cursor:pointer;font-size:13px;}
+  .file-label input{display:none;}
+  h2.panel-title{font-size:13px;font-weight:600;color:var(--text-secondary);margin:0 0 10px;}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:var(--surface-1);
+    border-radius:999px;padding:4px 10px;}
+  .badge button{height:18px;width:18px;padding:0;font-size:11px;border:none;background:transparent;cursor:pointer;color:var(--text-muted);}
+  .badge-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .minirow{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap;}
+  .minirow input,.minirow select{height:30px;font-size:12px;}
+  .page{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;overflow:hidden;}
+  .page-label{font-size:11px;color:var(--text-muted);margin-bottom:8px;}
+  #sheet-scroller{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  #sheet{min-width:700px;} .page{min-width:700px;}
+  .mobile-chord-btns{display:none;}
+  @media(max-width:768px){
+    #chordInputPanel .row{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+    #chordInputPanel .row>*{flex-shrink:0;}
+    #chordInputPanel .row .spacer{display:none;}
+    #chordInputPanel .sel-bar-info{min-width:auto;}
+    .compact-bar{flex-wrap:wrap;overflow-x:visible;}
+    .compact-bar .note-chip{width:44px;height:44px;font-size:20px;}
+    .compact-bar .sym-chip{min-width:44px;height:44px;font-size:13px;padding:0 8px;}
+    .compact-bar .degree-btn-sm{height:44px;flex:1 1 60px;min-width:60px;}
+    .compact-bar .degree-btn-sm .label{font-size:11px;}
+    .compact-bar .degree-btn-sm .sym{font-size:15px;}
+    .compact-bar .sep{height:32px;}
+  }
+  .note-item{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;
+    border:1px solid var(--border);border-radius:var(--radius);font-size:12px;cursor:pointer;user-select:none;}
+  .note-item.sel{background:#fde68a;border-color:#f59e0b;color:#78350f;}
+  @media(prefers-color-scheme:dark){.note-item.sel{background:#78350f;border-color:#f59e0b;color:#fde68a;}}
+  .note-item-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:150px;overflow:auto;}
+  #seekBar{width:100%;height:4px;cursor:pointer;accent-color:var(--accent);}
+  /* Note palette */
+  .note-palette{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px;
+    background:var(--surface-1);border-radius:var(--radius);margin-bottom:10px;}
+  .note-chip{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;
+    border:1.5px solid var(--border-strong);border-radius:var(--radius);font-size:20px;
+    cursor:grab;user-select:none;background:var(--surface);}
+  .note-chip:hover{border-color:var(--accent);background:var(--surface-1);}
+  .note-chip:active{cursor:grabbing;}
+  .sym-chip{display:inline-flex;align-items:center;justify-content:center;min-width:40px;height:40px;
+    padding:0 8px;border:1.5px solid var(--border-strong);border-radius:var(--radius);
+    font-size:12px;font-weight:700;cursor:grab;user-select:none;background:var(--surface);white-space:nowrap;}
+  .sym-chip:hover{border-color:var(--accent);background:var(--surface-1);}
+  .sym-chip:active{cursor:grabbing;}
+  /* Bar selection highlight is done via SVG fill */
+  .sel-bar-info{font-size:12px;color:var(--accent);font-weight:600;min-width:100px;}
+  .nc-hidden{opacity:0.3;}
+  .tog-btn-on{background:var(--accent,#378ADD)!important;color:#fff!important;border-color:transparent!important;}
+
+  /* フローティングコード入力パネル */
+  #chordInputPanel {
+    position: fixed; z-index: 1000;
+    width: calc(100vw - 32px);
+    max-height: 56vh; max-height: 56dvh; overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+    bottom: calc(16px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+    border-radius: 12px;
+  }
+  .drag-handle {
+    cursor: grab; display: flex; align-items: center; gap: 8px;
+    padding-bottom: 8px; margin-bottom: 8px;
+    border-bottom: 1px solid var(--border); user-select: none;
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .drag-handle .drag-icon { font-size: 18px; color: var(--text-muted); flex-shrink: 0; }
+  .snap-btn { height: 26px; padding: 0 10px; font-size: 11px; }
+  .wrap { padding-bottom: 320px; }
+
+  .page { position: relative; }
+  .copyright-label {
+    position: absolute; bottom: 8px; right: 14px;
+    font-size: 11px; color: var(--text-muted);
+    pointer-events: none; user-select: none;
+    font-family: -apple-system, sans-serif;
+  }
+
+  /* コンパクトパレット */
+  #chordInputPanel { padding: 10px 14px 8px; }
+  #chordInputPanel .drag-handle { padding-bottom: 6px; margin-bottom: 6px; }
+  #chordInputPanel .row { gap: 6px; }
+  #chordInputPanel .row + .row { margin-top: 6px; }
+  .compact-bar { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; overflow-x:auto; margin-top:6px; padding:4px 0; }
+  .compact-bar .note-chip { width:30px; height:30px; font-size:16px; flex-shrink:0; }
+  .compact-bar .sym-chip { min-width:30px; height:30px; font-size:11px; padding:0 6px; flex-shrink:0; }
+  .compact-bar .degree-btn-sm { height:30px; min-width:0; flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:1px; border:1px solid var(--border-strong);
+    border-radius:var(--radius); background:var(--surface); cursor:pointer; font-size:0; }
+  .compact-bar .degree-btn-sm .label { font-size:9px; color:var(--text-muted); line-height:1; }
+  .compact-bar .degree-btn-sm .sym { font-size:11px; font-weight:600; line-height:1; }
+  .compact-bar .sep { width:1px; height:22px; background:var(--border); flex-shrink:0; }
+
+  .compact-bar .degree-btn { height:30px; min-width:36px; flex:1; max-width:56px; gap:1px; border:1px solid var(--border-strong); border-radius:var(--radius); background:var(--surface); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .compact-bar .degree-btn .label { font-size:9px; }
+  .compact-bar .degree-btn .sym { font-size:11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>EasyChord</h1>
+  <p class="sub">五線譜の小節をクリックして選択 → 数字キーでコード入力。ノートをドラッグして五線譜に配置できます。</p>
+
+  <div class="layout">
+    <div class="main-col">
+
+      <div class="panel">
+        <h2 class="panel-title">曲名・コピーライト</h2>
+        <div class="row">
+          <input type="text" id="titleInput" placeholder="曲名を入力" style="flex:1;">
+          <span class="small">サイズ</span>
+          <input type="range" id="titleFontSize" min="12" max="36" value="22" style="width:90px;">
+          <span id="titleFontSizeOut" class="muted" style="min-width:32px;">22px</span>
+          <select id="titleFontFamily" style="width:110px;">
+            <option value="sans-serif">ゴシック</option>
+            <option value="serif">明朝</option>
+            <option value="Georgia,serif">Georgia</option>
+            <option value="'Times New Roman',serif">Times</option>
+            <option value="Arial,sans-serif">Arial</option>
+          </select>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <span class="small" style="white-space:nowrap;">© コピーライト</span>
+          <input type="text" id="copyrightInput" placeholder="2026 作曲者名" style="flex:1;">
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">開始キーと拍子</h2>
+        <div class="grid4">
+          <div class="field"><label>キー</label><select id="rootSelect"></select></div>
+          <div class="field"><label>モード</label>
+            <select id="modeSelect"><option value="major">メジャー</option><option value="minor">マイナー</option></select>
+          </div>
+          <div class="field"><label>拍子 分子</label><input type="number" id="beatsNum" value="4" min="1" max="16"></div>
+          <div class="field"><label>拍子 分母</label>
+            <select id="beatsDen"><option value="2">2</option><option value="4" selected>4</option><option value="8">8</option><option value="16">16</option></select>
+          </div>
+        </div>
+        <div class="field" style="margin-top:8px;"><label>1段あたりの小節数</label>
+          <input type="number" id="barsPerRowInput" value="4" min="1" max="16">
+        </div>
+        <div class="minirow">
+          <span class="small" style="white-space:nowrap;">転調：小節</span>
+          <input type="number" id="keyChangeBar" value="1" min="1" style="width:60px;">
+          <select id="keyChangeRoot" style="width:68px;"></select>
+          <button id="addKeyChange">追加</button>
+        </div>
+        <div class="badge-wrap" id="keyChangeList"></div>
+        <div class="minirow">
+          <span class="small" style="white-space:nowrap;">拍子変更：小節</span>
+          <input type="number" id="tsChangeBar" value="1" min="1" style="width:60px;">
+          <input type="number" id="tsChangeNum" value="4" min="1" max="16" style="width:52px;">
+          <span class="small">/</span>
+          <select id="tsChangeDen" style="width:60px;"><option value="2">2</option><option value="4" selected>4</option><option value="8">8</option><option value="16">16</option></select>
+          <button id="addTsChange">追加</button>
+        </div>
+        <div class="badge-wrap" id="tsChangeList"></div>
+        <div class="minirow">
+          <span class="small" style="white-space:nowrap;">セクション名（段の左に表示）</span>
+        </div>
+        <div class="badge-wrap" id="sectionList"></div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">小節の編集</h2>
+        <div class="row">
+          <span class="small">小節番号</span>
+          <input type="number" id="barEditNum" value="1" min="1" style="width:70px;">
+          <button id="barInsertAfterBtn">直後に1小節追加</button>
+          <button id="barDeleteBtn">この小節を削除</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 class="panel-title">音源</h2>
+        <div class="row">
+          <label class="file-label">音源を選択<input type="file" id="audioInput" accept="audio/*"></label>
+          <span id="fileName" class="muted">未選択</span>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <button id="skipBack" class="iconbtn" title="5秒戻る">«5</button>
+          <button id="playBtn" class="iconbtn" title="再生/一時停止">▶</button>
+          <button id="skipFwd" class="iconbtn" title="5秒進む">5»</button>
+          <span id="timeLabel" class="muted" style="font-family:var(--mono);min-width:90px;">0:00 / 0:00</span>
+          <span class="spacer"></span>
+          <span class="small">トランスポーズ</span>
+          <select id="transposeSelect" style="width:100px;"></select>
+        </div>
+        <div style="margin-top:8px;"><input type="range" id="seekBar" value="0" min="0" max="1000" step="1"></div>
+      </div>
+
+      <div class="panel" id="chordInputPanel">
+        <div class="drag-handle" id="chordDragHandle">
+          <span class="drag-icon">⠿</span>
+          <h2 class="panel-title" style="margin:0;">コード入力</h2>
+          <span style="flex:1;"></span>
+          <button class="snap-btn" id="snapTop">↑ 上に固定</button>
+          <button class="snap-btn" id="snapBottom">↓ 下に固定</button>
+        </div>
+        <!-- 設定行 -->
+        <div class="row">
+          <select id="inputMode" style="width:170px;height:28px;font-size:12px;">
+            <option value="diatonic_major">ダイアトニック（M）</option>
+            <option value="diatonic_minor">ダイアトニック（m）</option>
+            <option value="secondary">セカンダリーV7</option>
+          </select>
+          <span id="secondaryHint" class="muted" style="display:none;font-size:11px;">数字=どの度数へのV7</span>
+          <button id="soundToggleBtn" class="tog-btn-on" style="height:28px;font-size:12px;">🔊 ON</button>
+          <button id="ncToggleBtn" style="height:28px;font-size:12px;">N.C. 表示: OFF</button>
+          <button id="accidentalToggleBtn" class="tog-btn-on" style="height:28px;font-size:12px;">♯ 表記</button>
+          <button id="addSectionBtn" style="height:28px;font-size:12px;" title="選択中の小節を含む段の左端にセクション名テキストボックスを挿入">🏷 セクション追加</button>
+          <span class="spacer"></span>
+          <span class="sel-bar-info" id="selBarInfo" style="font-size:12px;">小節を選択</span>
+          <span class="muted" id="curBeatLabel" style="font-size:12px;">—</span>
+          <span class="small">文字</span>
+          <input type="range" id="fontSizeInput" min="10" max="22" value="14" style="width:70px;">
+          <span id="fontSizeOut" class="muted" style="min-width:28px;font-size:11px;">14px</span>
+          <select id="chordFontFamily" style="width:80px;height:28px;font-size:11px;">
+            <option value="sans-serif">ゴシック</option><option value="serif">明朝</option>
+            <option value="Arial,sans-serif">Arial</option><option value="Georgia,serif">Georgia</option>
+            <option value="'Times New Roman',serif">Times</option>
+          </select>
+        </div>
+        <!-- 度数ボタン＋音符＋記号 を1行に -->
+        <div class="compact-bar">
+          <div class="degree-grid" id="degreeRow" style="display:contents;"></div>
+          <div class="sep"></div>
+          <span class="note-chip" draggable="true" data-dur="4" title="4分音符">♩</span>
+          <span class="note-chip" draggable="true" data-dur="8" title="8分音符">♪</span>
+          <span class="note-chip" draggable="true" data-dur="16" title="16分音符" style="width:22px;height:30px;">
+            <svg viewBox="0 0 18 32" width="14" height="26" style="display:block;">
+              <ellipse cx="5" cy="27" rx="5" ry="3.5" fill="currentColor" transform="rotate(-15 5 27)"/>
+              <line x1="9.5" y1="27" x2="9.5" y2="4" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M9.5,4 C14,5 17,9 16,12" stroke="currentColor" stroke-width="1.5" fill="none"/>
+              <path d="M9.5,10 C14,11 17,15 16,18" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            </svg>
+          </span>
+          <label class="muted" style="display:flex;align-items:center;gap:3px;font-size:11px;flex-shrink:0;">
+            <input type="checkbox" id="dragTieCheck" style="width:12px;height:12px;"> タイ
+          </label>
+          <div class="sep"></div>
+          <span class="sym-chip" draggable="true" data-sym="start" title="リピート開始">|:</span>
+          <span class="sym-chip" draggable="true" data-sym="end" title="リピート終了">:|</span>
+          <span class="sym-chip" draggable="true" data-sym="segno" title="セーニョ" style="padding:2px;width:30px;height:30px;">
+            <img id="segnoChipImg" style="height:26px;width:auto;display:block;" alt="Segno">
+          </span>
+          <span class="sym-chip" draggable="true" data-sym="coda" title="コーダ" style="padding:2px;width:36px;height:30px;">
+            <img id="codaChipImg" style="height:22px;width:auto;display:block;" alt="Coda">
+          </span>
+          <span class="sym-chip" draggable="true" data-sym="dc" title="ダ・カーポ">D.C.</span>
+          <span class="sym-chip" draggable="true" data-sym="ds" title="ダル・セーニョ">D.S.</span>
+          <span class="sym-chip" draggable="true" data-sym="fine" title="フィーネ"><em>Fine</em></span>
+          <span class="sym-chip" draggable="true" data-sym="tocoda" title="To Coda" style="font-style:italic;">to Coda</span>
+        </div>
+        <div class="mobile-chord-btns" id="mobileDegreeBtns"></div>
+      </div>
+
+      <div class="panel">
+        <div class="top-actions">
+          <button id="copyBtn">コピー</button>
+          <button id="pdfBtn">PDF出力</button>
+        </div>
+        <h2 class="panel-title">リードシート（五線譜プレビュー）</h2>
+        <div id="sheet-scroller"><div id="sheet"></div></div>
+      </div>
+
+    </div>
+
+    <div class="side-col">
+      <div class="panel">
+        <div class="top-actions">
+          <button id="clearBtn">全消去</button>
+        </div>
+        <h2 class="panel-title">入力済みコード</h2>
+        <div id="list"></div>
+      </div>
+      <div class="panel">
+        <div class="top-actions">
+          <button id="deleteNoteBtn" disabled>選択を削除</button>
+          <button id="clearNotesBtn">全消去</button>
+        </div>
+        <h2 class="panel-title">入力済み音符</h2>
+        <div class="note-item-wrap" id="noteList"></div>
+      </div>
+      <div class="panel">
+        <div class="top-actions">
+          <button id="deleteRepeatBtn" disabled>選択を削除</button>
+          <button id="clearRepeatsBtn">全消去</button>
+        </div>
+        <h2 class="panel-title">リピート記号</h2>
+        <div class="note-item-wrap" id="repeatList"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+<script>
+(function(){
+
+  // 記号画像（透過PNG base64）
+  const CODA_IMG  = 'data:image/png;base64,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';
+  const SEGNO_IMG = 'data:image/png;base64,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';
+  const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const NOTE_NAMES_FLAT=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+  let accidentalPref='sharp'; // 'sharp' | 'flat' — コード表記を♯系/♭系のどちらで表示するか
+  function noteName(idx){ return (accidentalPref==='flat'?NOTE_NAMES_FLAT:NOTE_NAMES)[idx]; }
+  function escapeXml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;'); }
+  const MAJOR_STEPS=[0,2,4,5,7,9,11];
+  const MINOR_STEPS=[0,2,3,5,7,8,10];
+  const MAJOR_QUALITY=['','m','m','','','m','dim'];
+  const MINOR_QUALITY=['m','dim','','m','m','',''];
+  const ROMAN_MAJOR=['I','ii','iii','IV','V','vi','vii°'];
+  const ROMAN_MINOR=['i','ii°','III','iv','v','VI','VII'];
+  const EXT_OPTIONS=['','6','7','maj7','m7','m7b5','dim7','sus2','sus4','9','maj9','m9','add9','11','13','aug'];
+  const MAJOR_KEY_SIG=[
+    {type:'sharp',count:0},{type:'flat',count:5},{type:'sharp',count:2},{type:'flat',count:3},
+    {type:'sharp',count:4},{type:'flat',count:1},{type:'sharp',count:6},{type:'sharp',count:1},
+    {type:'flat',count:4},{type:'sharp',count:3},{type:'flat',count:2},{type:'sharp',count:5}
+  ];
+  const SHARP_ORDER=['F','C','G','D','A','E','B'];
+  const FLAT_ORDER=['B','E','A','D','G','C','F'];
+  const SHARP_STEPS={F:0,C:3,G:-1,D:2,A:5,E:1,B:4};
+  const FLAT_STEPS={B:4,E:1,A:5,D:2,G:6,C:3,F:7};
+  const DUR_LABELS={'4':'♩ 4分','8':'♪ 8分','16':'♬ 16分'};
+
+  // DOM
+  const rootSelect=document.getElementById('rootSelect');
+  const modeSelect=document.getElementById('modeSelect');
+  const beatsNum=document.getElementById('beatsNum');
+  const beatsDen=document.getElementById('beatsDen');
+  const barsPerRowInput=document.getElementById('barsPerRowInput');
+  const degreeRow=document.getElementById('degreeRow');
+  const mobileDegreeBtns=document.getElementById('mobileDegreeBtns');
+  const listEl=document.getElementById('list');
+  const sheetEl=document.getElementById('sheet');
+  const audioInput=document.getElementById('audioInput');
+  const fileName=document.getElementById('fileName');
+  const inputModeSel=document.getElementById('inputMode');
+  const secondaryHint=document.getElementById('secondaryHint');
+  const transposeSelect=document.getElementById('transposeSelect');
+  const timeLabel=document.getElementById('timeLabel');
+  const playBtn=document.getElementById('playBtn');
+  const seekBar=document.getElementById('seekBar');
+  const fontSizeInput=document.getElementById('fontSizeInput');
+  const fontSizeOut=document.getElementById('fontSizeOut');
+  const chordFontFamily=document.getElementById('chordFontFamily');
+  const soundToggleBtn=document.getElementById('soundToggleBtn');
+  const ncToggleBtn=document.getElementById('ncToggleBtn');
+  const accidentalToggleBtn=document.getElementById('accidentalToggleBtn');
+  const titleInput=document.getElementById('titleInput');
+  const titleFontSize=document.getElementById('titleFontSize');
+  const titleFontSizeOut=document.getElementById('titleFontSizeOut');
+  const titleFontFamily=document.getElementById('titleFontFamily');
+  const copyrightInput=document.getElementById('copyrightInput');
+  const keyChangeListEl=document.getElementById('keyChangeList');
+  const tsChangeListEl=document.getElementById('tsChangeList');
+  const sectionListEl=document.getElementById('sectionList');
+  const addSectionBtn=document.getElementById('addSectionBtn');
+  const keyChangeBarInput=document.getElementById('keyChangeBar');
+  const tsChangeBarInput=document.getElementById('tsChangeBar');
+  const noteListEl=document.getElementById('noteList');
+  const deleteNoteBtn=document.getElementById('deleteNoteBtn');
+  const clearNotesBtn=document.getElementById('clearNotesBtn');
+  const selBarInfo=document.getElementById('selBarInfo');
+  const curBeatLabel=document.getElementById('curBeatLabel');
+
+  function refreshRootSelectLabels(){
+    [rootSelect,document.getElementById('keyChangeRoot')].forEach(sel=>{
+      Array.from(sel.options).forEach(o=>{ o.textContent=noteName(parseInt(o.value,10)); });
+    });
+  }
+  NOTE_NAMES.forEach((n,i)=>{
+    [rootSelect,document.getElementById('keyChangeRoot')].forEach(sel=>{
+      const o=document.createElement('option'); o.value=i; o.textContent=n; if(n==='C') o.selected=true; sel.appendChild(o);
+    });
+  });
+  for(let s=-12;s<=12;s++){
+    const o=document.createElement('option'); o.value=s; o.textContent=(s>0?'+':'')+s+'半音'; if(s===0) o.selected=true; transposeSelect.appendChild(o);
+  }
+
+  // State
+  let entries=[];
+  let rhythmEntries=[]; let rhythmIdCounter=0; let selectedNoteId=null;
+  let repeatEntries=[]; let repeatIdCounter=0; let selectedRepeatId=null;
+  const SYM_LABELS={start:'|: リピート開始',end:':| リピート終了',segno:'⊕ セーニョ',coda:'⊗ コーダ',dc:'D.C.',ds:'D.S.',fine:'Fine',tocoda:'to Coda'};
+  let curBar=null; let curBeat=1; // null = 未選択
+  let selectedBarNum=null;
+  let barCoordMap={}; // bar -> {svgX, svgW, staffTop, staffH, bpb, svgEl}
+  let timeSigChanges=[{bar:1,num:4,den:4}];
+  let keyChanges=[{bar:1,root:0,mode:'major'}];
+  let sectionLabels=[]; // {bar(段の先頭小節), text} 段の左端（ト音記号の左）に表示する自由入力テキスト
+  const SECTION_LABEL_W=35; // セクションテキストボックスの幅（この分だけ段の五線譜エリアを右にずらす）
+  let soundOn=true;
+  let showNC=false;
+
+  const INTERVALS={
+    '':[0,4,7],'m':[0,3,7],'dim':[0,3,6],'aug':[0,4,8],
+    '6':[0,4,7,9],'7':[0,4,7,10],'maj7':[0,4,7,11],'m7':[0,3,7,10],
+    'm7b5':[0,3,6,10],'dim7':[0,3,6,9],'sus2':[0,2,7],'sus4':[0,5,7],
+    '9':[0,4,7,10,14],'maj9':[0,4,7,11,14],'m9':[0,3,7,10,14],
+    'add9':[0,4,7,14],'11':[0,4,7,10,14,17],'13':[0,4,7,10,14,21]
+  };
+
+  // Synth (lazy)
+  let synthInstance=null;
+  function getSynth(){
+    if(!synthInstance){
+      try{ synthInstance=new Tone.PolySynth(Tone.Synth,{oscillator:{type:'triangle'},envelope:{attack:0.02,decay:0.15,sustain:0.2,release:0.3}}).toDestination(); }
+      catch(e){ console.warn('Synth init failed',e); }
+    }
+    return synthInstance;
+  }
+
+  // Audio player (Web Audio)
+  let audioCtx=null,audioBuffer=null,sourceNode=null;
+  let offsetSeconds=0,playStartCtx=0,isPlaying=false,durationSec=0;
+  let seekDragging=false;
+  function getDetune(){ return (parseInt(transposeSelect.value,10)||0)*100; }
+  async function loadAudio(url){
+    if(sourceNode){try{sourceNode.stop();}catch(e){} sourceNode=null;}
+    if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const res=await fetch(url); const arr=await res.arrayBuffer();
+    audioBuffer=await audioCtx.decodeAudioData(arr);
+    durationSec=audioBuffer.duration; offsetSeconds=0; isPlaying=false; playBtn.textContent='▶'; updateTimeLabel();
+  }
+  function startPlayback(){
+    if(!audioBuffer||!audioCtx) return;
+    if(sourceNode){try{sourceNode.stop();}catch(e){}}
+    sourceNode=audioCtx.createBufferSource(); sourceNode.buffer=audioBuffer;
+    sourceNode.detune.value=getDetune(); sourceNode.connect(audioCtx.destination);
+    sourceNode.start(0,offsetSeconds); playStartCtx=audioCtx.currentTime; isPlaying=true; playBtn.textContent='❙❙';
+    sourceNode.onended=()=>{ if(isPlaying){offsetSeconds=0;isPlaying=false;playBtn.textContent='▶';updateTimeLabel();updateSeekBar();} };
+  }
+  function currentElapsed(){ return isPlaying?Math.min(offsetSeconds+(audioCtx.currentTime-playStartCtx),durationSec):offsetSeconds; }
+  function fmtTime(t){ const m=Math.floor(t/60),s=Math.floor(t%60).toString().padStart(2,'0'); return m+':'+s; }
+  function updateTimeLabel(){ const t=Math.max(0,Math.min(currentElapsed(),durationSec)); timeLabel.textContent=fmtTime(t)+' / '+fmtTime(durationSec); }
+  function updateSeekBar(){ if(seekDragging||!durationSec) return; seekBar.value=Math.round(currentElapsed()/durationSec*1000); }
+  setInterval(()=>{ if(isPlaying){updateTimeLabel();updateSeekBar();} },200);
+  playBtn.addEventListener('click',async()=>{
+    if(!audioBuffer) return;
+    if(audioCtx.state==='suspended') await audioCtx.resume();
+    if(isPlaying){ offsetSeconds=currentElapsed(); sourceNode.onended=null; try{sourceNode.stop();}catch(e){} sourceNode=null; isPlaying=false; playBtn.textContent='▶'; }
+    else{ if(offsetSeconds>=durationSec) offsetSeconds=0; startPlayback(); }
+    updateTimeLabel(); updateSeekBar();
+  });
+  seekBar.addEventListener('mousedown',()=>seekDragging=true);
+  seekBar.addEventListener('touchstart',()=>seekDragging=true,{passive:true});
+  seekBar.addEventListener('input',()=>{ if(!durationSec) return; offsetSeconds=parseFloat(seekBar.value)/1000*durationSec; updateTimeLabel(); });
+  seekBar.addEventListener('change',()=>{ seekDragging=false; if(!durationSec) return; offsetSeconds=parseFloat(seekBar.value)/1000*durationSec; if(isPlaying) startPlayback(); updateTimeLabel(); });
+  document.getElementById('skipBack').addEventListener('click',()=>{ offsetSeconds=Math.max(0,currentElapsed()-5); if(isPlaying) startPlayback(); updateTimeLabel(); updateSeekBar(); });
+  document.getElementById('skipFwd').addEventListener('click',()=>{ offsetSeconds=Math.min(durationSec,currentElapsed()+5); if(isPlaying) startPlayback(); updateTimeLabel(); updateSeekBar(); });
+  transposeSelect.addEventListener('change',()=>{ if(isPlaying&&sourceNode) sourceNode.detune.value=getDetune(); });
+  audioInput.addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return; fileName.textContent=f.name; loadAudio(URL.createObjectURL(f)); });
+
+  // Toggles
+  soundToggleBtn.addEventListener('click',()=>{ soundOn=!soundOn; soundToggleBtn.textContent=soundOn?'🔊 音: ON':'🔇 音: OFF'; soundToggleBtn.classList.toggle('tog-btn-on',soundOn); });
+  ncToggleBtn.addEventListener('click',()=>{
+    showNC=!showNC;
+    ncToggleBtn.textContent='N.C. 表示: '+(showNC?'ON':'OFF');
+    ncToggleBtn.classList.toggle('tog-btn-on',showNC);
+    renderAll();
+  });
+  accidentalToggleBtn.addEventListener('click',()=>{
+    accidentalPref=accidentalPref==='sharp'?'flat':'sharp';
+    accidentalToggleBtn.textContent=accidentalPref==='sharp'?'♯ 表記':'♭ 表記';
+    accidentalToggleBtn.classList.toggle('tog-btn-on',accidentalPref==='sharp');
+    refreshRootSelectLabels();
+    renderKeyChangeList();
+    buildDegreeButtons();
+    renderAll();
+  });
+  addSectionBtn.addEventListener('click',()=>{
+    if(curBar==null){ alert('先に小節を選択してください。'); return; }
+    const rs=rowStartBar(curBar);
+    if(sectionLabels.some(s=>s.bar===rs)){ renderSectionList(); return; }
+    sectionLabels.push({bar:rs,text:''});
+    sectionLabels.sort((a,b)=>a.bar-b.bar);
+    renderSectionList(); renderSheet();
+  });
+
+  // Scale helpers
+  function scaleArrays(mode){ return mode==='minor'?{steps:MINOR_STEPS,quality:MINOR_QUALITY,roman:ROMAN_MINOR}:{steps:MAJOR_STEPS,quality:MAJOR_QUALITY,roman:ROMAN_MAJOR}; }
+  function timeSigAtBar(bar){ let r=timeSigChanges[0]; for(const c of timeSigChanges){ if(c.bar<=bar) r=c; } return r; }
+  function beatsPerBarAtBar(bar){ return timeSigAtBar(bar).num; }
+  function keyAtBar(bar){ let r=keyChanges[0]; for(const c of keyChanges){ if(c.bar<=bar) r=c; } return r; }
+  function noteForDegreeAtRoot(degree,mode,rootIdx){ return (rootIdx+scaleArrays(mode).steps[degree-1])%12; }
+  function currentForce(){ return inputModeSel.value==='diatonic_minor'?'minor':'major'; }
+
+  function chordSymbol(entry){
+    if(entry.nc) return 'N.C.';
+    let base;
+    if(entry.secondaryOf){
+      const k=keyAtBar(entry.bar);
+      const targetNote=noteForDegreeAtRoot(entry.secondaryOf,k.mode,k.root);
+      const domRoot=(targetNote+7)%12;
+      base=noteName(domRoot)+(entry.ext||'7');
+    } else {
+      const k=keyAtBar(entry.bar);
+      const force=entry.forceScale||'major';
+      const note=noteForDegreeAtRoot(entry.degree,force,k.root);
+      const baseQ=scaleArrays(force).quality[entry.degree-1];
+      base=noteName(note)+(entry.ext?entry.ext:(baseQ==='dim'?'dim':baseQ));
+    }
+    if(entry.bassNote!=null) base+='/'+noteName(entry.bassNote);
+    return base;
+  }
+  function romanLabel(entry){
+    if(entry.nc) return 'N.C.';
+    if(entry.secondaryOf) return 'V'+(entry.ext||'7')+'/'+scaleArrays(keyAtBar(entry.bar).mode).roman[entry.secondaryOf-1];
+    return scaleArrays(entry.forceScale||'major').roman[entry.degree-1];
+  }
+  function chordIntervalsAndRoot(entry){
+    if(entry.nc) return null;
+    if(entry.secondaryOf){
+      const k=keyAtBar(entry.bar);
+      const targetNote=noteForDegreeAtRoot(entry.secondaryOf,k.mode,k.root);
+      return {rootNote:(targetNote+7)%12,intervals:INTERVALS[entry.ext||'7']||INTERVALS['7']};
+    }
+    const k=keyAtBar(entry.bar);
+    const force=entry.forceScale||'major';
+    const rootNote=noteForDegreeAtRoot(entry.degree,force,k.root);
+    const baseQ=scaleArrays(force).quality[entry.degree-1];
+    return {rootNote,intervals:INTERVALS[entry.ext||baseQ||'']||INTERVALS['']};
+  }
+  async function playChord(entry){
+    if(!soundOn||entry.nc) return;
+    try{
+      await Tone.start();
+      const synth=getSynth(); if(!synth) return;
+      const ri=chordIntervalsAndRoot(entry); if(!ri) return;
+      const notes=ri.intervals.map(iv=>Tone.Frequency(60+ri.rootNote+iv,'midi').toNote());
+      synth.triggerAttackRelease(notes,'8n');
+    }catch(e){ console.warn('playChord error',e); }
+  }
+
+  // Bar selection
+  function selectBar(bar, beat=1){
+    selectedBarNum=bar; curBar=bar; curBeat=beat;
+    updateSelBarInfo(); buildDegreeButtons(); renderSheet();
+  }
+  function updateSelBarInfo(){
+    if(curBar==null){ selBarInfo.textContent='小節を選択してください'; curBeatLabel.textContent='—'; return; }
+    selBarInfo.textContent=curBar+'小節目を入力中';
+    curBeatLabel.textContent=curBeat+'拍目';
+    keyChangeBarInput.value=curBar;
+    tsChangeBarInput.value=curBar;
+  }
+
+  // Degree buttons
+  function buildDegreeButtons(){
+    degreeRow.innerHTML=''; mobileDegreeBtns.innerHTML='';
+    const secMode=inputModeSel.value==='secondary';
+    secondaryHint.style.display=secMode?'inline':'none';
+    const force=currentForce();
+    const k=curBar!=null?keyAtBar(curBar):{root:parseInt(rootSelect.value,10),mode:modeSelect.value};
+    const makeInner=(d)=>{
+      let label,sym;
+      if(secMode){
+        const tn=noteForDegreeAtRoot(d,k.mode,k.root); const dr=(tn+7)%12;
+        label='V7/'+scaleArrays(k.mode).roman[d-1]; sym=noteName(dr)+'7';
+      } else {
+        const note=noteForDegreeAtRoot(d,force,k.root); const q=scaleArrays(force).quality[d-1];
+        label=d+'/'+scaleArrays(force).roman[d-1]; sym=noteName(note)+(q==='dim'?'dim':q);
+      }
+      return '<span class="label">'+label+'</span><span class="sym">'+sym+'</span>';
+    };
+    for(let d=1;d<=7;d++){
+      const inner=makeInner(d);
+      [degreeRow,mobileDegreeBtns].forEach(p=>{ const b=document.createElement('button'); b.className='degree-btn'; b.innerHTML=inner; b.addEventListener('click',()=>addEntry(d)); p.appendChild(b); });
+    }
+    // N.C.
+    [degreeRow,mobileDegreeBtns].forEach(p=>{
+      const b=document.createElement('button'); b.className='degree-btn';
+      b.innerHTML='<span class="label">0/N.C.</span><span class="sym">N.C.</span>';
+      b.addEventListener('click',addNCEntry); p.appendChild(b);
+    });
+  }
+
+  function advanceBeat(){
+    if(curBar==null) return;
+    const bpb=beatsPerBarAtBar(curBar);
+    if(curBeat<bpb){ curBeat++; }
+    else { curBar++; curBeat=1; selectedBarNum=curBar; }
+    updateSelBarInfo(); buildDegreeButtons();
+    renderSheet(); // re-highlight
+  }
+
+  function addEntry(degree){
+    if(curBar==null){ selectBar(1); }
+    const secMode=inputModeSel.value==='secondary';
+    entries=entries.filter(e=>!(e.bar===curBar&&e.beat===curBeat));
+    const ne={bar:curBar,beat:curBeat,degree,secondaryOf:secMode?degree:null,forceScale:secMode?null:currentForce(),ext:'',nc:false,bassNote:null,ncVisible:true};
+    entries.push(ne); entries.sort((a,b)=>a.bar-b.bar||a.beat-b.beat);
+    advanceBeat(); renderList(); playChord(ne);
+  }
+  function addNCEntry(){
+    if(curBar==null){ selectBar(1); }
+    entries=entries.filter(e=>!(e.bar===curBar&&e.beat===curBeat));
+    const ne={bar:curBar,beat:curBeat,degree:0,secondaryOf:null,forceScale:'major',ext:'',nc:true,bassNote:null,ncVisible:true};
+    entries.push(ne); entries.sort((a,b)=>a.bar-b.bar||a.beat-b.beat);
+    advanceBeat(); renderList();
+  }
+
+  function renderAll(){ buildDegreeButtons(); try{renderList();}catch(e){console.error(e);} try{renderSheet();}catch(e){console.error(e);} }
+
+  function renderList(){
+    listEl.innerHTML='';
+    if(!entries.length){ listEl.innerHTML='<span class="empty-note">まだ入力がありません</span>'; return; }
+    entries.forEach((e,i)=>{
+      const row=document.createElement('div'); row.className='entry-row';
+      if(e.nc&&!e.ncVisible) row.classList.add('nc-hidden');
+      const top=document.createElement('div'); top.className='er-top';
+      const sym=document.createElement('span');
+      sym.textContent=chordSymbol(e)+'  ('+romanLabel(e)+')';
+      sym.style.fontWeight='600'; sym.style.fontSize='13px';
+      const posInput=document.createElement('input'); posInput.type='text'; posInput.value=e.bar+'.'+e.beat; posInput.style.fontFamily='var(--mono)';
+      posInput.addEventListener('change',()=>{
+        const pts=posInput.value.split('.'); const bar=parseInt(pts[0],10)||1,beat=parseInt(pts[1],10)||1;
+        entries=entries.filter(x=>!(x.bar===bar&&x.beat===beat)||x===e); e.bar=bar; e.beat=beat;
+        entries.sort((a,b)=>a.bar-b.bar||a.beat-b.beat); renderAll();
+      });
+      top.appendChild(sym); top.appendChild(posInput);
+      const controls=document.createElement('div'); controls.className='er-controls';
+      if(!e.nc){
+        const extSel=document.createElement('select'); extSel.style.width='70px';
+        EXT_OPTIONS.forEach(opt=>{ const o=document.createElement('option'); o.value=opt; o.textContent=opt===''?'自動':opt; if(opt===e.ext) o.selected=true; extSel.appendChild(o); });
+        extSel.addEventListener('change',()=>{ e.ext=extSel.value; renderAll(); });
+        const secSel=document.createElement('select'); secSel.style.width='90px';
+        const noneOpt=document.createElement('option'); noneOpt.value=''; noneOpt.textContent=e.forceScale==='minor'?'ダイアトニック(m)':'ダイアトニック'; secSel.appendChild(noneOpt);
+        for(let d=1;d<=7;d++){ const o=document.createElement('option'); o.value=d; o.textContent='V7/'+scaleArrays(keyAtBar(e.bar).mode).roman[d-1]; if(e.secondaryOf===d) o.selected=true; secSel.appendChild(o); }
+        secSel.addEventListener('change',()=>{ e.secondaryOf=secSel.value?parseInt(secSel.value,10):null; if(e.secondaryOf) e.forceScale=null; else if(!e.forceScale) e.forceScale='major'; renderAll(); });
+        const bassSel=document.createElement('select'); bassSel.style.width='60px'; bassSel.title='ベース音';
+        const bassNone=document.createElement('option'); bassNone.value=''; bassNone.textContent='/—'; bassSel.appendChild(bassNone);
+        NOTE_NAMES.forEach((n,ni)=>{ const o=document.createElement('option'); o.value=ni; o.textContent='/'+noteName(ni); if(e.bassNote===ni) o.selected=true; bassSel.appendChild(o); });
+        bassSel.addEventListener('change',()=>{ e.bassNote=bassSel.value===''?null:parseInt(bassSel.value,10); renderAll(); });
+        const play=document.createElement('button'); play.textContent='♪'; play.style.width='26px'; play.style.padding='0';
+        play.addEventListener('click',()=>playChord(e));
+        controls.appendChild(extSel); controls.appendChild(secSel); controls.appendChild(bassSel); controls.appendChild(play);
+      } else {
+        // N.C. 個別表示トグル
+        const ncVis=document.createElement('button'); ncVis.textContent=e.ncVisible?'表示':'非表示'; ncVis.style.fontSize='11px'; ncVis.style.padding='0 6px';
+        ncVis.addEventListener('click',()=>{ e.ncVisible=!e.ncVisible; renderAll(); });
+        controls.appendChild(ncVis);
+      }
+      const del=document.createElement('button'); del.textContent='×'; del.style.width='26px'; del.style.padding='0';
+      del.addEventListener('click',()=>{ entries.splice(i,1); renderAll(); });
+      controls.appendChild(del);
+      row.appendChild(top); row.appendChild(controls); listEl.appendChild(row);
+    });
+  }
+
+  // Note list
+  function renderNoteList(){
+    noteListEl.innerHTML='';
+    if(!rhythmEntries.length){ noteListEl.innerHTML='<span class="muted">音符がありません</span>'; return; }
+    rhythmEntries.forEach(r=>{
+      const el=document.createElement('span'); el.className='note-item'+(r.id===selectedNoteId?' sel':'');
+      el.textContent=r.bar+'小節 '+(r.beatOffset+1)+'拍 '+DUR_LABELS[r.dur]+(r.tie?' ⌒':'');
+      el.addEventListener('click',()=>{ selectedNoteId=(selectedNoteId===r.id)?null:r.id; deleteNoteBtn.disabled=(selectedNoteId==null); renderNoteList(); });
+      noteListEl.appendChild(el);
+    });
+  }
+  deleteNoteBtn.addEventListener('click',()=>{
+    if(selectedNoteId==null) return;
+    rhythmEntries=rhythmEntries.filter(r=>r.id!==selectedNoteId); selectedNoteId=null; deleteNoteBtn.disabled=true; renderNoteList(); renderSheet();
+  });
+  clearNotesBtn.addEventListener('click',()=>{ rhythmEntries=[]; selectedNoteId=null; deleteNoteBtn.disabled=true; renderNoteList(); renderSheet(); });
+
+  const deleteRepeatBtn=document.getElementById('deleteRepeatBtn');
+  const clearRepeatsBtn=document.getElementById('clearRepeatsBtn');
+  function renderRepeatList(){
+    const el=document.getElementById('repeatList');
+    el.innerHTML='';
+    if(!repeatEntries.length){ el.innerHTML='<span class="muted">記号がありません</span>'; return; }
+    repeatEntries.forEach(r=>{
+      const item=document.createElement('span');
+      item.className='note-item'+(r.id===selectedRepeatId?' sel':'');
+      item.textContent=r.bar+'小節 '+(SYM_LABELS[r.type]||r.type);
+      item.addEventListener('click',()=>{ selectedRepeatId=(selectedRepeatId===r.id)?null:r.id; deleteRepeatBtn.disabled=(selectedRepeatId==null); renderRepeatList(); });
+      el.appendChild(item);
+    });
+  }
+  deleteRepeatBtn.addEventListener('click',()=>{
+    if(selectedRepeatId==null) return;
+    repeatEntries=repeatEntries.filter(r=>r.id!==selectedRepeatId); selectedRepeatId=null; deleteRepeatBtn.disabled=true; renderRepeatList(); renderSheet();
+  });
+  clearRepeatsBtn.addEventListener('click',()=>{ repeatEntries=[]; selectedRepeatId=null; deleteRepeatBtn.disabled=true; renderRepeatList(); renderSheet(); });
+
+  // Build bar map
+  function buildBarMap(){
+    const map={};
+    entries.forEach(e=>{
+      const visible=!(e.nc&&(!e.ncVisible||!showNC));
+      if(!visible) return;
+      const bpb=beatsPerBarAtBar(e.bar),offset=(e.beat-1)/bpb;
+      if(!map[e.bar]) map[e.bar]=[];
+      map[e.bar].push({symbol:chordSymbol(e),offset});
+    });
+    return map;
+  }
+
+  function keySignatureAccidentals(root,mode){
+    const majorRoot=mode==='minor'?(root+3)%12:root;
+    const sig=MAJOR_KEY_SIG[majorRoot];
+    if(sig.type==='sharp') return {type:'sharp',letters:SHARP_ORDER.slice(0,sig.count)};
+    return {type:'flat',letters:FLAT_ORDER.slice(0,sig.count)};
+  }
+
+  // Note SVG
+  function notesSVGForBar(bar,barX,barW,staffTop,lineGap,bpb){
+    const staffMid=staffTop+lineGap*2; const stemH=lineGap*3;
+    let svg='';
+    const notes=rhythmEntries.filter(r=>r.bar===bar);
+    notes.forEach((r,idx)=>{
+      const nx=barX+4+(r.beatOffset/bpb)*(barW-8);
+      const hy=staffMid; const rx=lineGap*0.55,ry=lineGap*0.38;
+      svg+='<ellipse cx="'+(nx+rx)+'" cy="'+hy+'" rx="'+rx+'" ry="'+ry+'" fill="var(--text)" transform="rotate(-15 '+(nx+rx)+' '+hy+')" />';
+      const stemX=nx+rx*2-1,stemTop=hy-stemH;
+      svg+='<line x1="'+stemX+'" y1="'+hy+'" x2="'+stemX+'" y2="'+stemTop+'" stroke="var(--text)" stroke-width="1.2"/>';
+      if(r.dur==='8'||r.dur==='16'){
+        svg+='<path d="M'+stemX+','+stemTop+' C'+(stemX+6)+','+(stemTop+2)+' '+(stemX+lineGap*1.4)+','+(stemTop+lineGap*1.2-4)+' '+(stemX+lineGap*1.4)+','+(stemTop+lineGap*1.2)+'" stroke="var(--text)" stroke-width="1.4" fill="none"/>';
+      }
+      if(r.dur==='16'){
+        const f2y=stemTop+lineGap*1.2;
+        svg+='<path d="M'+stemX+','+f2y+' C'+(stemX+6)+','+(f2y+2)+' '+(stemX+lineGap*1.4)+','+(f2y+lineGap*1.2-4)+' '+(stemX+lineGap*1.4)+','+(f2y+lineGap*1.2)+'" stroke="var(--text)" stroke-width="1.4" fill="none"/>';
+      }
+      if(r.tie){
+        const next=notes[idx+1];
+        let tieEndX=next?(barX+4+(next.beatOffset/bpb)*(barW-8)):Math.min(nx+rx+Math.min(barW/Math.max(bpb,1),lineGap*5),barX+barW-6);
+        const tieY=hy+ry+3; const midX=(nx+rx+tieEndX)/2;
+        svg+='<path d="M'+(nx+rx)+','+tieY+' Q'+midX+','+(tieY+lineGap*0.9)+' '+tieEndX+','+tieY+'" stroke="var(--text)" stroke-width="1.2" fill="none"/>';
+      }
+    });
+    return svg;
+  }
+
+  // リピート記号SVG
+  function repeatsSVGForBar(bar,x,barW,staffTop,staffHeight,lineGap){
+    let svg='';
+    const reps=repeatEntries.filter(r=>r.bar===bar);
+    if(!reps.length) return svg;
+    const ty=staffTop+staffHeight+12; // テキスト類のY位置（スタッフ下）
+    let dcOffset=0; // D.C./D.S./Fine が重ならないようオフセット
+    reps.forEach(r=>{
+      switch(r.type){
+        case 'start':
+          svg+='<rect x="'+x+'" y="'+staffTop+'" width="4" height="'+staffHeight+'" fill="var(--text)"/>';
+          svg+='<line x1="'+(x+6)+'" y1="'+staffTop+'" x2="'+(x+6)+'" y2="'+(staffTop+staffHeight)+'" stroke="var(--text)" stroke-width="1.2"/>';
+          svg+='<circle cx="'+(x+10)+'" cy="'+(staffTop+lineGap*1.5)+'" r="2.2" fill="var(--text)"/>';
+          svg+='<circle cx="'+(x+10)+'" cy="'+(staffTop+lineGap*2.5)+'" r="2.2" fill="var(--text)"/>';
+          break;
+        case 'end':
+          svg+='<rect x="'+(x+barW-4)+'" y="'+staffTop+'" width="4" height="'+staffHeight+'" fill="var(--text)"/>';
+          svg+='<line x1="'+(x+barW-6)+'" y1="'+staffTop+'" x2="'+(x+barW-6)+'" y2="'+(staffTop+staffHeight)+'" stroke="var(--text)" stroke-width="1.2"/>';
+          svg+='<circle cx="'+(x+barW-10)+'" cy="'+(staffTop+lineGap*1.5)+'" r="2.2" fill="var(--text)"/>';
+          svg+='<circle cx="'+(x+barW-10)+'" cy="'+(staffTop+lineGap*2.5)+'" r="2.2" fill="var(--text)"/>';
+          break;
+        case 'segno':
+          {
+            // セーニョ: 1拍目のコード名左上に配置
+            const sh=24, sw=Math.round(sh*460/514);
+            const sx=x+barW*0.12-30, sy=staffTop-8-sh-6;
+            const dfilt=window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches?'invert(1)':'';
+            svg+='<image href="'+SEGNO_IMG+'" x="'+sx+'" y="'+sy+'" width="'+sw+'" height="'+sh+'"'+(dfilt?' style="filter:invert(1)"':'')+'/>';
+          }
+          break;
+        case 'coda':
+          {
+            // コーダ: 1拍目のコード名左上に配置
+            const ch=18, cw=Math.round(ch*453/340);
+            const cxi=x+barW*0.12-30, cyi=staffTop-8-ch-6;
+            const dfilt2=window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches?'invert(1)':'';
+            svg+='<image href="'+CODA_IMG+'" x="'+cxi+'" y="'+cyi+'" width="'+cw+'" height="'+ch+'"'+(dfilt2?' style="filter:invert(1)"':'')+'/>';
+          }
+          break;
+        case 'dc':
+          svg+='<text x="'+(x+barW-4)+'" y="'+(ty-dcOffset)+'" font-size="12" text-anchor="end" fill="var(--text)" font-weight="700">D.C.</text>';
+          dcOffset-=14;
+          break;
+        case 'ds':
+          svg+='<text x="'+(x+barW-4)+'" y="'+(ty-dcOffset)+'" font-size="12" text-anchor="end" fill="var(--text)" font-weight="700">D.S.</text>';
+          dcOffset-=14;
+          break;
+        case 'fine':
+          svg+='<text x="'+(x+barW-4)+'" y="'+(ty-dcOffset)+'" font-size="12" text-anchor="end" fill="var(--text)" font-style="italic" font-weight="600">Fine</text>';
+          dcOffset-=14;
+          break;
+        case 'tocoda':
+          svg+='<text x="'+(x+barW-4)+'" y="'+(ty-dcOffset)+'" font-size="12" text-anchor="end" fill="var(--text)" font-style="italic" font-weight="600">to Coda</text>';
+          dcOffset-=14;
+          break;
+      }
+    });
+    return svg;
+  }
+
+  // Key change marker
+  function keyChangeSVGForBar(bar,x,staffTop,lineGap){
+    const kc=keyChanges.find(c=>c.bar===bar);
+    if(!kc||kc===keyChanges[0]) return '';
+    const acc=keySignatureAccidentals(kc.root,kc.mode);
+    const ch=acc.type==='sharp'?'♯':'♭';
+    let svg='';
+    acc.letters.forEach((letter,idx)=>{
+      const step=acc.type==='sharp'?SHARP_STEPS[letter]:FLAT_STEPS[letter];
+      const y=staffTop+step*(lineGap/2);
+      svg+='<text x="'+(x+2+idx*7)+'" y="'+(y+3)+'" font-size="11" fill="var(--accent,#378ADD)">'+ch+'</text>';
+    });
+    if(acc.letters.length===0) svg+='<text x="'+(x+2)+'" y="'+(staffTop+lineGap*2+4)+'" font-size="9" fill="var(--accent,#378ADD)">♮</text>';
+    return svg;
+  }
+
+  // Main SVG row renderer
+  function renderStaffRowSVG(barNums,barMap,width,fontSize,rowKey,tsBarsSet,sectionText){
+    const lineGap=8; const staffTop=Math.max(30,fontSize+16); const staffHeight=lineGap*4;
+    const h=staffTop+staffHeight+30;
+    const acc=keySignatureAccidentals(rowKey.root,rowKey.mode);
+    const hasSection=sectionText!=null;
+    const leadIn=hasSection?SECTION_LABEL_W:0;
+    const clefX=2+leadIn,clefWidth=18,accStartX=clefX+clefWidth+2,accSpacing=7;
+    const ts=timeSigAtBar(barNums[0]);
+    const tsWidth=tsBarsSet.has(barNums[0])?(ts.num>=10?18:12):0;
+    const barsStartX=accStartX+acc.letters.length*accSpacing+4+tsWidth;
+    const barsWidth=width-barsStartX-6;
+    const barW=barsWidth/barNums.length;
+    const cfam=chordFontFamily.value||'sans-serif';
+    const FIXED_W=700;
+
+    const topPad=16;
+    let svg='<svg viewBox="0 -'+topPad+' '+FIXED_W+' '+(h+topPad)+'" width="'+FIXED_W+'" height="'+(h+topPad)+'" style="display:block;max-width:none;overflow:visible;" role="img">';
+    // セクションテキストボックス（段の一番左）
+    if(hasSection){
+      const boxW=leadIn-6;
+      svg+='<rect x="2" y="'+(staffTop+2)+'" width="'+boxW+'" height="'+(staffHeight-4)+'" rx="3" fill="none" stroke="white"/>';
+      if(sectionText){
+        const fitsFree=sectionText.length*7<=boxW-4;
+        const lenAttr=fitsFree?'':' textLength="'+(boxW-4)+'" lengthAdjust="spacingAndGlyphs"';
+        svg+='<text x="'+(2+boxW/2)+'" y="'+(staffTop+staffHeight/2+4)+'" font-size="12" font-weight="600" text-anchor="middle" fill="var(--text)"'+lenAttr+'>'+escapeXml(sectionText)+'</text>';
+      }
+    }
+    // 五線
+    for(let i=0;i<5;i++){
+      const y=staffTop+i*lineGap;
+      svg+='<line x1="'+clefX+'" y1="'+y+'" x2="'+(width-4)+'" y2="'+y+'" stroke="var(--border-strong)" stroke-width="1"/>';
+    }
+    // ト音記号
+    svg+='<text x="'+clefX+'" y="'+(staffTop+staffHeight*0.78)+'" font-size="'+(staffHeight*1.9)+'" fill="var(--text)" font-family="serif">𝄞</text>';
+    // 調号
+    acc.letters.forEach((letter,idx)=>{
+      const step=acc.type==='sharp'?SHARP_STEPS[letter]:FLAT_STEPS[letter];
+      const y=staffTop+step*(lineGap/2);
+      const ch=acc.type==='sharp'?'♯':'♭';
+      svg+='<text x="'+(accStartX+idx*accSpacing)+'" y="'+(y+3)+'" font-size="13" fill="var(--text)">'+ch+'</text>';
+    });
+    // 拍子（段先頭）
+    if(tsBarsSet.has(barNums[0])){
+      const tsX=accStartX+acc.letters.length*accSpacing+2;
+      svg+='<text x="'+tsX+'" y="'+(staffTop+staffHeight*0.45)+'" font-size="'+(staffHeight*0.43)+'" font-weight="600" fill="var(--text)">'+ts.num+'</text>';
+      svg+='<text x="'+tsX+'" y="'+(staffTop+staffHeight*0.95)+'" font-size="'+(staffHeight*0.43)+'" font-weight="600" fill="var(--text)">'+ts.den+'</text>';
+    }
+    svg+='<line x1="'+barsStartX+'" y1="'+staffTop+'" x2="'+barsStartX+'" y2="'+(staffTop+staffHeight)+'" stroke="var(--border-strong)" stroke-width="1"/>';
+
+    barNums.forEach((bar,idx)=>{
+      const x=barsStartX+idx*barW;
+      const bpb=beatsPerBarAtBar(bar);
+      // 座標を保存（drag & drop 用）
+      // barCoordMapはSVG座標で保存、実際はviewBoxと一致
+      barCoordMap[bar]={svgX:x,svgW:barW,staffTop,staffH:staffHeight,bpb};
+      // 拍ごとのハイライトとヒットエリア（4拍単位でクリック選択）
+      const beatW=barW/bpb;
+      // 選択中の小節のハイライト背景
+      if(bar===selectedBarNum){
+        svg+='<rect x="'+x+'" y="'+staffTop+'" width="'+barW+'" height="'+staffHeight+'" fill="rgba(55,138,221,0.08)" rx="2"/>';
+      }
+      // 拍の区切り線（細い点線）
+      for(let b=1;b<bpb;b++){
+        const bx=x+b*beatW;
+        svg+='<line x1="'+bx+'" y1="'+(staffTop+3)+'" x2="'+bx+'" y2="'+(staffTop+staffHeight-3)+'" stroke="var(--border)" stroke-width="0.6" stroke-dasharray="2,2"/>';
+      }
+      svg+='<line x1="'+(x+barW)+'" y1="'+staffTop+'" x2="'+(x+barW)+'" y2="'+(staffTop+staffHeight)+'" stroke="var(--border-strong)" stroke-width="1"/>';
+      // 転調マーカー
+      svg+=keyChangeSVGForBar(bar,x,staffTop,lineGap);
+      // コード
+      const chords=barMap[bar];
+      if(chords&&chords.length){
+        chords.forEach(c=>{
+          const cx=x+6+c.offset*(barW-12);
+          svg+='<text x="'+cx+'" y="'+(staffTop-8)+'" font-size="'+fontSize+'" font-weight="600" fill="var(--text)" font-family="'+cfam+'">'+c.symbol+'</text>';
+        });
+      } else {
+        svg+='<text x="'+(x+barW/2)+'" y="'+(staffTop+staffHeight/2+4)+'" font-size="'+Math.max(10,fontSize-2)+'" text-anchor="middle" fill="var(--text-muted)">%</text>';
+      }
+      // 小節番号
+      if(idx===0) svg+='<text x="'+(x+2)+'" y="'+(staffTop+staffHeight+14)+'" font-size="10" fill="var(--text-muted)">'+bar+'</text>';
+      // 拍子変更（段内）
+      if(idx>0&&tsBarsSet.has(bar)){
+        const ts2=timeSigAtBar(bar);
+        svg+='<text x="'+(x+2)+'" y="'+(staffTop+staffHeight*0.45)+'" font-size="'+(staffHeight*0.43)+'" font-weight="600" fill="var(--accent,#378ADD)">'+ts2.num+'</text>';
+        svg+='<text x="'+(x+2)+'" y="'+(staffTop+staffHeight*0.95)+'" font-size="'+(staffHeight*0.43)+'" font-weight="600" fill="var(--accent,#378ADD)">'+ts2.den+'</text>';
+      }
+      // 音符
+      svg+=notesSVGForBar(bar,x,barW,staffTop,lineGap,bpb);
+      svg+=repeatsSVGForBar(bar,x,barW,staffTop,staffHeight,lineGap);
+      // 拍ごとのヒットエリア（クリック & ドロップ）
+      for(let b=1;b<=bpb;b++){
+        const bx=x+(b-1)*beatW;
+        const isThisBeat=(bar===curBar&&b===curBeat);
+        const beatFill=isThisBeat?'rgba(55,138,221,0.28)':'rgba(0,0,0,0)';
+        svg+='<rect class="beat-hit" data-bar="'+bar+'" data-beat="'+b+'" x="'+bx+'" y="'+staffTop+'" width="'+beatW+'" height="'+staffHeight+'" fill="'+beatFill+'" cursor="pointer" pointer-events="all"/>';
+      }
+    });
+
+    svg+='</svg>';
+    return svg;
+  }
+
+  // Sheet rendering
+  function renderSheet(){
+    sheetEl.innerHTML=''; barCoordMap={};
+    const allBars=[...new Set([...entries.map(e=>e.bar),...rhythmEntries.map(r=>r.bar)])];
+    if(curBar!=null) allBars.push(curBar);
+    // エントリがなくても最低4段分の小節を表示してクリックできるようにする
+    const bpRow2=parseInt(barsPerRowInput.value,10)||4;
+    const minBars=bpRow2*4;
+    const maxBar=Math.max(...allBars, minBars);
+    const barsPerRow=parseInt(barsPerRowInput.value,10)||4;
+    const fontSize=parseInt(fontSizeInput.value,10)||14;
+    const tFontSize=parseInt(titleFontSize.value,10)||22;
+    const tFontFamily=titleFontFamily.value||'sans-serif';
+    const barMap=buildBarMap();
+    const tsBarsSet=new Set(timeSigChanges.map(c=>c.bar));
+    const width=700;
+    const rows=[];
+    for(let rs=1;rs<=maxBar;rs+=barsPerRow){
+      const bn=[]; for(let b=rs;b<rs+barsPerRow;b++) bn.push(b); rows.push(bn);
+    }
+    const A4_ASPECT=3508/2480;
+    const a4H=Math.round(width*A4_ASPECT); // 700pxの内容幅に対するA4比率の高さ（例:990px）
+    const rowHeightPx=Math.max(30,fontSize+16)+32+30+16;
+    const pageHeaderPx=44;
+    const titleHeightPx=titleInput.value?(tFontSize*2.2+12):0;
+    const availableH=a4H-pageHeaderPx;
+    const rowsPerPageBase=Math.max(1,Math.floor(availableH/rowHeightPx));
+    const rowsPerPage1=Math.max(1,Math.floor((availableH-titleHeightPx)/rowHeightPx));
+    const totalPagesCalc=rows.length<=rowsPerPage1?1:1+Math.ceil((rows.length-rowsPerPage1)/rowsPerPageBase);
+
+    let rowIdx=0,pageNum=0;
+    while(rowIdx<rows.length){
+      pageNum++;
+      const rpp=pageNum===1?rowsPerPage1:rowsPerPageBase;
+      const pageRows=rows.slice(rowIdx,rowIdx+rpp); rowIdx+=rpp;
+      const pageDiv=document.createElement('div'); pageDiv.className='page'; pageDiv.style.width=(width+32)+'px';
+      pageDiv.style.height=(a4H+32)+'px'; // A4比率の高さ + padding(16*2)。box-sizing:border-boxのためコンテンツ領域はa4H相当になる
+      const label=document.createElement('div'); label.className='page-label'; label.textContent=pageNum+'/'+totalPagesCalc; pageDiv.appendChild(label);
+      if(pageNum===1&&titleInput.value){
+        const th=Math.round(tFontSize*2.2+12);
+        const titleSvg=document.createElement('div');
+        titleSvg.innerHTML='<svg viewBox="0 0 '+width+' '+th+'" width="'+width+'" height="'+th+'">'
+          +'<text x="'+(width/2)+'" y="'+(th*0.72)+'" font-size="'+tFontSize+'" font-weight="700" text-anchor="middle" fill="var(--text)" font-family="'+tFontFamily+'">'+titleInput.value+'</text></svg>';
+        pageDiv.appendChild(titleSvg);
+      }
+      pageRows.forEach(barNums=>{
+        const rowKey=keyAtBar(barNums[0]);
+        const div=document.createElement('div');
+        div.innerHTML=renderStaffRowSVG(barNums,barMap,width,fontSize,rowKey,tsBarsSet,sectionTextForBar(barNums[0]));
+        pageDiv.appendChild(div);
+      });
+      // コピーライトをページ右下に表示
+      if(copyrightInput.value.trim()){
+        const cpEl=document.createElement('div');
+        cpEl.className='copyright-label';
+        cpEl.textContent='\u00A9 '+copyrightInput.value.trim();
+        pageDiv.appendChild(cpEl);
+      }
+      sheetEl.appendChild(pageDiv);
+    }
+  }
+
+  function getBarBeatFromEvent(e){
+    let el=e.target;
+    while(el&&el!==sheetEl){
+      if(el.dataset&&el.dataset.bar){
+        return {bar:parseInt(el.dataset.bar), beat:el.dataset.beat?parseInt(el.dataset.beat):1};
+      }
+      el=el.parentElement;
+    }
+    return null;
+  }
+  function getBarFromEvent(e){
+    const r=getBarBeatFromEvent(e); return r?r.bar:null;
+  }
+
+  function handleSheetClick(e){
+    const r=getBarBeatFromEvent(e); if(!r) return;
+    selectBar(r.bar, r.beat);
+  }
+
+  function handleDragOver(e){
+    const bar=getBarFromEvent(e); if(bar==null) return;
+    e.preventDefault(); e.dataTransfer.dropEffect='copy';
+  }
+
+  function handleDrop(e){
+    const bar=getBarFromEvent(e); if(bar==null) return;
+    e.preventDefault();
+    const sym=e.dataTransfer.getData('sym');
+    if(sym){
+      repeatEntries.push({id:++repeatIdCounter,bar,type:sym});
+      repeatEntries.sort((a,b)=>a.bar-b.bar);
+      renderRepeatList(); renderSheet(); return;
+    }
+    const dur=e.dataTransfer.getData('dur')||'4';
+    const tie=e.dataTransfer.getData('tie')==='true';
+    // SVG座標に変換してbeat計算
+    let beatOffset=0;
+    try{
+      const svgEl=e.target.closest('svg');
+      if(svgEl&&barCoordMap[bar]){
+        const coords=barCoordMap[bar];
+        const pt=svgEl.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
+        const svgCoords=pt.matrixTransform(svgEl.getScreenCTM().inverse());
+        let raw=((svgCoords.x-coords.svgX)/coords.svgW)*coords.bpb;
+        raw=Math.max(0,Math.min(coords.bpb-0.001,raw));
+        beatOffset=Math.round(raw*2)/2;
+      }
+    }catch(err){}
+    rhythmEntries.push({id:++rhythmIdCounter,bar,beatOffset,dur,tie});
+    rhythmEntries.sort((a,b)=>a.bar-b.bar||a.beatOffset-b.beatOffset);
+    renderNoteList(); renderSheet();
+  }
+
+  // Note palette drag（マウス）
+  document.querySelectorAll('.note-chip').forEach(chip=>{
+    chip.addEventListener('dragstart',e=>{
+      e.dataTransfer.setData('dur',chip.dataset.dur);
+      e.dataTransfer.setData('tie',document.getElementById('dragTieCheck').checked?'true':'false');
+      e.dataTransfer.effectAllowed='copy';
+    });
+  });
+
+  // タッチドラッグ（スマホ・タブレット）
+  let touchDragDur=null, touchGhost=null;
+  document.querySelectorAll('.note-chip').forEach(chip=>{
+    chip.addEventListener('touchstart',e=>{
+      e.preventDefault();
+      touchDragDur=chip.dataset.dur;
+      touchGhost=document.createElement('div');
+      touchGhost.style.cssText='position:fixed;z-index:9999;pointer-events:none;width:44px;height:44px;border-radius:8px;background:var(--accent);opacity:0.85;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;';
+      touchGhost.textContent={'4':'♩','8':'♪','16':'♬'}[chip.dataset.dur]||'♩';
+      document.body.appendChild(touchGhost);
+      const t=e.touches[0];
+      touchGhost.style.left=(t.clientX-22)+'px'; touchGhost.style.top=(t.clientY-44)+'px';
+    },{passive:false});
+    chip.addEventListener('touchmove',e=>{
+      e.preventDefault();
+      if(!touchGhost) return;
+      const t=e.touches[0];
+      touchGhost.style.left=(t.clientX-22)+'px'; touchGhost.style.top=(t.clientY-44)+'px';
+    },{passive:false});
+    chip.addEventListener('touchend',e=>{
+      e.preventDefault();
+      if(touchGhost){touchGhost.remove();touchGhost=null;}
+      if(!touchDragDur) return;
+      const t=e.changedTouches[0];
+      // タッチ位置の要素を取得（ghostを一時的に非表示にして）
+      const el=document.elementFromPoint(t.clientX,t.clientY);
+      touchDragDur=null;
+      if(!el) return;
+      let target=el;
+      while(target&&target!==sheetEl){
+        if(target.dataset&&target.dataset.bar) break;
+        target=target.parentElement;
+      }
+      if(!target||!target.dataset||!target.dataset.bar) return;
+      const bar=parseInt(target.dataset.bar);
+      const tie=document.getElementById('dragTieCheck').checked;
+      const dur=chip.dataset.dur;
+      let beatOffset=0;
+      try{
+        const svgEl=target.closest?target.closest('svg'):null;
+        if(svgEl&&barCoordMap[bar]){
+          const coords=barCoordMap[bar];
+          const pt=svgEl.createSVGPoint(); pt.x=t.clientX; pt.y=t.clientY;
+          const sc=pt.matrixTransform(svgEl.getScreenCTM().inverse());
+          let raw=((sc.x-coords.svgX)/coords.svgW)*coords.bpb;
+          raw=Math.max(0,Math.min(coords.bpb-0.001,raw));
+          beatOffset=Math.round(raw*2)/2;
+        }
+      }catch(err){}
+      rhythmEntries.push({id:++rhythmIdCounter,bar,beatOffset,dur,tie});
+      rhythmEntries.sort((a,b)=>a.bar-b.bar||a.beatOffset-b.beatOffset);
+      renderNoteList(); renderSheet();
+    },{passive:false});
+  });
+
+  // 記号チップ ドラッグ（マウス）
+  document.querySelectorAll('.sym-chip').forEach(chip=>{
+    chip.addEventListener('dragstart',e=>{
+      e.dataTransfer.setData('sym',chip.dataset.sym);
+      e.dataTransfer.effectAllowed='copy';
+    });
+  });
+
+  // 記号チップ タッチドラッグ（スマホ・タブレット）
+  document.querySelectorAll('.sym-chip').forEach(chip=>{
+    chip.addEventListener('touchstart',e=>{
+      e.preventDefault();
+      touchGhost=document.createElement('div');
+      touchGhost.style.cssText='position:fixed;z-index:9999;pointer-events:none;min-width:44px;height:44px;border-radius:8px;background:var(--accent);opacity:0.85;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;padding:0 8px;';
+      touchGhost.textContent=chip.dataset.sym==='start'?'|:':chip.dataset.sym==='end'?':|':chip.dataset.sym==='segno'?'§':chip.dataset.sym==='coda'?'⊕':chip.dataset.sym==='tocoda'?'to Coda':chip.dataset.sym.toUpperCase();
+      document.body.appendChild(touchGhost);
+      const t=e.touches[0];
+      touchGhost.style.left=(t.clientX-22)+'px'; touchGhost.style.top=(t.clientY-44)+'px';
+    },{passive:false});
+    chip.addEventListener('touchmove',e=>{
+      e.preventDefault();
+      if(!touchGhost) return;
+      const t=e.touches[0];
+      touchGhost.style.left=(t.clientX-22)+'px'; touchGhost.style.top=(t.clientY-44)+'px';
+    },{passive:false});
+    chip.addEventListener('touchend',e=>{
+      e.preventDefault();
+      if(touchGhost){touchGhost.remove();touchGhost=null;}
+      const t=e.changedTouches[0];
+      const el=document.elementFromPoint(t.clientX,t.clientY);
+      if(!el) return;
+      let target=el;
+      while(target&&target!==sheetEl){
+        if(target.dataset&&target.dataset.bar) break;
+        target=target.parentElement;
+      }
+      if(!target||!target.dataset||!target.dataset.bar) return;
+      const bar=parseInt(target.dataset.bar);
+      repeatEntries.push({id:++repeatIdCounter,bar,type:chip.dataset.sym});
+      repeatEntries.sort((a,b)=>a.bar-b.bar);
+      renderRepeatList(); renderSheet();
+    },{passive:false});
+  });
+
+  // Key/TS change lists
+  function renderKeyChangeList(){
+    keyChangeListEl.innerHTML='';
+    keyChanges.forEach((c,i)=>{
+      const b=document.createElement('span'); b.className='badge';
+      b.innerHTML='<span>'+c.bar+'小節: '+noteName(c.root)+(c.mode==='major'?' Maj':' Min')+'</span>';
+      if(i>0){ const d=document.createElement('button'); d.textContent='×'; d.addEventListener('click',()=>{ keyChanges.splice(i,1); renderKeyChangeList(); renderAll(); }); b.appendChild(d); }
+      keyChangeListEl.appendChild(b);
+    });
+  }
+  function renderTsChangeList(){
+    tsChangeListEl.innerHTML='';
+    timeSigChanges.forEach((c,i)=>{
+      const b=document.createElement('span'); b.className='badge';
+      b.innerHTML='<span>'+c.bar+'小節: '+c.num+'/'+c.den+'</span>';
+      if(i>0){ const d=document.createElement('button'); d.textContent='×'; d.addEventListener('click',()=>{ timeSigChanges.splice(i,1); renderTsChangeList(); renderAll(); }); b.appendChild(d); }
+      tsChangeListEl.appendChild(b);
+    });
+  }
+  function renderSectionList(){
+    sectionListEl.innerHTML='';
+    if(!sectionLabels.length){ sectionListEl.innerHTML='<span class="empty-note" style="font-size:11px;">「🏷 セクション追加」ボタンで小節を選択して追加できます</span>'; return; }
+    sectionLabels.forEach((s,i)=>{
+      const b=document.createElement('span'); b.className='badge';
+      const barLabel=document.createElement('span'); barLabel.textContent=s.bar+'小節目〜'; barLabel.style.color='var(--text-muted)'; barLabel.style.fontSize='11px';
+      const inp=document.createElement('input'); inp.type='text'; inp.value=s.text; inp.placeholder='セクション名';
+      inp.style.width='90px'; inp.style.height='22px'; inp.style.fontSize='12px'; inp.style.border='1px solid var(--border)'; inp.style.borderRadius='4px'; inp.style.padding='0 4px';
+      inp.addEventListener('input',()=>{ s.text=inp.value; renderSheet(); });
+      const d=document.createElement('button'); d.textContent='×'; d.addEventListener('click',()=>{ sectionLabels.splice(i,1); renderSectionList(); renderSheet(); });
+      b.appendChild(barLabel); b.appendChild(inp); b.appendChild(d);
+      sectionListEl.appendChild(b);
+    });
+  }
+  function rowStartBar(bar){
+    const bpr=parseInt(barsPerRowInput.value,10)||4;
+    return 1+Math.floor((bar-1)/bpr)*bpr;
+  }
+  function sectionTextForBar(bar){
+    const s=sectionLabels.find(x=>x.bar===bar);
+    return s?s.text:null;
+  }
+
+  document.getElementById('addKeyChange').addEventListener('click',()=>{
+    const bar=parseInt(document.getElementById('keyChangeBar').value,10)||1;
+    const root=parseInt(document.getElementById('keyChangeRoot').value,10);
+    const mode=keyAtBar(bar).mode;
+    keyChanges=keyChanges.filter(c=>c.bar!==bar); keyChanges.push({bar,root,mode}); keyChanges.sort((a,b)=>a.bar-b.bar);
+    renderKeyChangeList(); renderAll();
+  });
+  document.getElementById('addTsChange').addEventListener('click',()=>{
+    const bar=parseInt(document.getElementById('tsChangeBar').value,10)||1;
+    const num=parseInt(document.getElementById('tsChangeNum').value,10)||4;
+    const den=parseInt(document.getElementById('tsChangeDen').value,10)||4;
+    timeSigChanges=timeSigChanges.filter(c=>c.bar!==bar); timeSigChanges.push({bar,num,den}); timeSigChanges.sort((a,b)=>a.bar-b.bar);
+    renderTsChangeList(); renderAll();
+  });
+
+  // Bar edit
+  function shiftBarsFrom(afterBar,delta){
+    entries.forEach(e=>{ if(e.bar>afterBar) e.bar+=delta; });
+    rhythmEntries.forEach(r=>{ if(r.bar>afterBar) r.bar+=delta; });
+    repeatEntries.forEach(r=>{ if(r.bar>afterBar) r.bar+=delta; });
+    keyChanges.forEach(c=>{ if(c.bar>afterBar) c.bar+=delta; });
+    timeSigChanges.forEach(c=>{ if(c.bar>afterBar) c.bar+=delta; });
+    sectionLabels.forEach(s=>{ if(s.bar>afterBar) s.bar+=delta; });
+    entries.sort((a,b)=>a.bar-b.bar||a.beat-b.beat);
+    rhythmEntries.sort((a,b)=>a.bar-b.bar||a.beatOffset-b.beatOffset);
+    keyChanges.sort((a,b)=>a.bar-b.bar); timeSigChanges.sort((a,b)=>a.bar-b.bar);
+    sectionLabels.sort((a,b)=>a.bar-b.bar);
+  }
+  document.getElementById('barInsertAfterBtn').addEventListener('click',()=>{
+    const n=parseInt(document.getElementById('barEditNum').value,10)||1;
+    shiftBarsFrom(n,1); renderKeyChangeList(); renderTsChangeList(); renderSectionList(); renderNoteList(); renderAll();
+  });
+  document.getElementById('barDeleteBtn').addEventListener('click',()=>{
+    const n=parseInt(document.getElementById('barEditNum').value,10)||1;
+    entries=entries.filter(e=>e.bar!==n); rhythmEntries=rhythmEntries.filter(r=>r.bar!==n);
+    keyChanges=keyChanges.filter(c=>c.bar!==n||c===keyChanges[0]);
+    timeSigChanges=timeSigChanges.filter(c=>c.bar!==n||c===timeSigChanges[0]);
+    sectionLabels=sectionLabels.filter(s=>s.bar!==n);
+    shiftBarsFrom(n,-1); renderKeyChangeList(); renderTsChangeList(); renderSectionList(); renderNoteList(); renderAll();
+  });
+
+  // Settings changes
+  rootSelect.addEventListener('change',()=>{ keyChanges[0].root=parseInt(rootSelect.value,10); buildDegreeButtons(); renderAll(); });
+  modeSelect.addEventListener('change',()=>{ keyChanges[0].mode=modeSelect.value; buildDegreeButtons(); renderAll(); });
+  beatsNum.addEventListener('input',()=>{ timeSigChanges[0].num=parseInt(beatsNum.value,10)||4; renderTsChangeList(); renderAll(); });
+  beatsDen.addEventListener('change',()=>{ timeSigChanges[0].den=parseInt(beatsDen.value,10)||4; renderTsChangeList(); renderAll(); });
+  barsPerRowInput.addEventListener('input',renderSheet);
+  inputModeSel.addEventListener('change',buildDegreeButtons);
+  fontSizeInput.addEventListener('input',()=>{ fontSizeOut.textContent=fontSizeInput.value+'px'; renderSheet(); });
+  chordFontFamily.addEventListener('change',renderSheet);
+  titleInput.addEventListener('input',renderSheet);
+  titleFontSize.addEventListener('input',()=>{ titleFontSizeOut.textContent=titleFontSize.value+'px'; renderSheet(); });
+  titleFontFamily.addEventListener('change',renderSheet);
+  copyrightInput.addEventListener('input',renderSheet);
+
+  // Clear & copy
+  document.getElementById('clearBtn').addEventListener('click',()=>{ entries=[]; curBar=null; curBeat=1; selectedBarNum=null; updateSelBarInfo(); renderAll(); });
+  document.getElementById('copyBtn').addEventListener('click',()=>{
+    const bpRow=parseInt(barsPerRowInput.value,10)||4;
+    const barMap=buildBarMap();
+    const maxBar=entries.length?Math.max(...entries.map(e=>e.bar)):0;
+    let lines=[]; if(titleInput.value) lines.push(titleInput.value);
+    for(let rs=1;rs<=maxBar;rs+=bpRow){
+      let cells=[]; for(let b=rs;b<rs+bpRow;b++) cells.push(barMap[b]?barMap[b].map(c=>c.symbol).join('/'):'%');
+      lines.push(cells.join(' | '));
+    }
+    navigator.clipboard.writeText(lines.join('\n'));
+  });
+
+  // PDF
+  document.getElementById('pdfBtn').addEventListener('click',async()=>{
+    if(!window.jspdf||!window.html2canvas){ alert('ライブラリ読み込み中です。しばらくお待ちください。'); return; }
+    const {jsPDF}=window.jspdf;
+    const pages=sheetEl.querySelectorAll('.page');
+    if(!pages.length){ alert('コードを入力してください。'); return; }
+    const btn=document.getElementById('pdfBtn'); btn.textContent='生成中...'; btn.disabled=true;
+    const bgColor=getComputedStyle(document.documentElement).getPropertyValue('--surface').trim()||'#ffffff';
+    try{
+      const A4_W=2480,A4_H=3508;
+      const width=700; // SVGコンテンツ幅。renderSheet()内のwidthと同じ値（ローカルスコープのため直接参照できない）
+      const doc=new jsPDF({unit:'px',format:[A4_W,A4_H],orientation:'portrait'});
+      for(let i=0;i<pages.length;i++){
+        const page=pages[i];
+        const pageW=width+32; // SVGコンテンツ幅(700)+パディング(16*2)
+        const scale=A4_W/pageW;
+        const canvas=await html2canvas(page,{scale,useCORS:true,backgroundColor:bgColor,logging:false,width:pageW,windowWidth:pageW});
+        const outCanvas=document.createElement('canvas'); outCanvas.width=A4_W; outCanvas.height=A4_H;
+        const ctx=outCanvas.getContext('2d'); ctx.fillStyle=bgColor; ctx.fillRect(0,0,A4_W,A4_H);
+        ctx.drawImage(canvas,0,0,A4_W,Math.round(canvas.height*(A4_W/canvas.width)));
+        if(i>0) doc.addPage([A4_W,A4_H],'portrait');
+        doc.addImage(outCanvas.toDataURL('image/jpeg',0.96),'JPEG',0,0,A4_W,A4_H);
+      }
+      doc.save('chord-leadsheet.pdf');
+    }catch(err){ alert('PDF生成に失敗しました: '+err.message); }
+    finally{ btn.textContent='PDF出力'; btn.disabled=false; }
+  });
+
+  // Keyboard
+  document.addEventListener('keydown',e=>{
+    const tag=document.activeElement&&document.activeElement.tagName;
+    if(tag==='SELECT'||tag==='INPUT'||tag==='TEXTAREA') return;
+    if(e.key>='1'&&e.key<='7'){ addEntry(parseInt(e.key,10)); }
+    else if(e.key==='0'){ addNCEntry(); }
+    else if(e.key==='Backspace'){
+      e.preventDefault();
+      const removed=entries.pop();
+      if(removed){ curBar=removed.bar; curBeat=removed.beat; selectedBarNum=curBar; }
+      updateSelBarInfo(); renderAll();
+    }
+  });
+
+  // イベント委譲（一度だけ登録）
+  sheetEl.addEventListener('click',handleSheetClick);
+  sheetEl.addEventListener('dragover',handleDragOver);
+  sheetEl.addEventListener('drop',handleDrop);
+
+  // Init
+  // 記号チップ画像のsrcをセット（ダークモードは色反転）
+  document.getElementById('segnoChipImg').src = SEGNO_IMG;
+  document.getElementById('codaChipImg').src  = CODA_IMG;
+  // ダークモードでは画像を白に反転
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if(prefersDark){
+    document.querySelectorAll('#segnoChipImg,#codaChipImg').forEach(img=>{
+      img.style.filter='invert(1)';
+    });
+  }
+
+
+  // ── フローティングコード入力パネルのドラッグ ──
+  (function(){
+    const panel = document.getElementById('chordInputPanel');
+    const handle = document.getElementById('chordDragHandle');
+    // bodyの直下に移動して position:fixed が確実に効くように
+    document.body.appendChild(panel);
+
+    let drag = null;
+    function startDrag(cx, cy){
+      const r = panel.getBoundingClientRect();
+      panel.style.transform = 'none';
+      panel.style.left = r.left + 'px';
+      panel.style.top  = r.top  + 'px';
+      panel.style.bottom = 'auto';
+      drag = { sx: cx, sy: cy, ol: r.left, ot: r.top };
+    }
+    function moveDrag(cx, cy){
+      if(!drag) return;
+      let nl = drag.ol + cx - drag.sx;
+      let nt = drag.ot + cy - drag.sy;
+      // 画面外に出ないよう制限
+      nl = Math.max(0, Math.min(window.innerWidth  - panel.offsetWidth,  nl));
+      nt = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, nt));
+      panel.style.left = nl + 'px';
+      panel.style.top  = nt + 'px';
+    }
+    function endDrag(){ drag = null; }
+
+    handle.addEventListener('mousedown', e => {
+      if(['BUTTON','SELECT','INPUT'].includes(e.target.tagName)) return;
+      e.preventDefault(); startDrag(e.clientX, e.clientY);
+    });
+    document.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+    document.addEventListener('mouseup',   endDrag);
+
+    handle.addEventListener('touchstart', e => {
+      if(['BUTTON','SELECT','INPUT'].includes(e.target.tagName)) return;
+      e.preventDefault();
+      const t = e.touches[0]; startDrag(t.clientX, t.clientY);
+    }, {passive:false});
+    handle.addEventListener('touchmove', e => {
+      e.preventDefault();
+      const t = e.touches[0]; moveDrag(t.clientX, t.clientY);
+    }, {passive:false});
+    handle.addEventListener('touchend', endDrag);
+
+    document.getElementById('snapTop').addEventListener('click', () => {
+      panel.style.top = '16px'; panel.style.bottom = 'auto';
+      panel.style.left = '50%'; panel.style.transform = 'translateX(-50%)';
+    });
+    document.getElementById('snapBottom').addEventListener('click', () => {
+      panel.style.top = 'auto'; panel.style.bottom = 'calc(16px + env(safe-area-inset-bottom))';
+      panel.style.left = '50%'; panel.style.transform = 'translateX(-50%)';
+    });
+  })();
+
+  buildDegreeButtons(); updateSelBarInfo(); renderKeyChangeList(); renderTsChangeList(); renderSectionList(); renderNoteList(); renderRepeatList(); renderSheet();
+})();
+</script>
+</body>
+</html>
